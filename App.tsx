@@ -3,14 +3,23 @@ import TranslatorView from './components/TranslatorView';
 import ChatView from './components/ChatView';
 import LiveView from './components/LiveView';
 import HistoryView from './components/HistoryView';
+import OnboardingModal from './components/OnboardingModal';
 import { AppMode } from './types';
 import { Stethoscope, MessageSquare, Mic, ShieldCheck, History, WifiOff } from 'lucide-react';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.TRANSLATOR);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [demoInput, setDemoInput] = useState('');
 
   useEffect(() => {
+    // Check if user has seen onboarding
+    const hasSeenOnboarding = localStorage.getItem('cms_auditor_onboarding_seen');
+    if (!hasSeenOnboarding) {
+      setShowOnboarding(true);
+    }
+
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
@@ -23,8 +32,27 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false);
+    localStorage.setItem('cms_auditor_onboarding_seen', 'true');
+  };
+
+  const handleRunDemo = () => {
+    // Pre-fill translator with a complex case for the demo
+    setDemoInput("Patient is 78yo female, severe OA in knees. Can't walk to bathroom safely anymore. Hands are too weak for a standard walker. Needs something with wheels and a seat.");
+    setMode(AppMode.TRANSLATOR);
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <OnboardingModal 
+          onClose={handleCloseOnboarding} 
+          onRunDemo={handleRunDemo}
+        />
+      )}
+
       {/* Offline Banner */}
       {isOffline && (
         <div className="bg-amber-500 text-white text-center py-1 text-xs font-bold flex items-center justify-center space-x-2 sticky top-0 z-[60]">
@@ -114,7 +142,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 pb-24 md:pb-8">
-        {mode === AppMode.TRANSLATOR && <TranslatorView />}
+        {mode === AppMode.TRANSLATOR && <TranslatorView initialInput={demoInput} />}
         {mode === AppMode.HISTORY && <HistoryView />}
         {mode === AppMode.CHAT && <ChatView />}
         {mode === AppMode.LIVE && <LiveView />}

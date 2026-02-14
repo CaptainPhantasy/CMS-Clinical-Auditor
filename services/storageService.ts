@@ -78,7 +78,14 @@ export const getHistory = (): HistoryItem[] => {
 };
 
 export const saveToHistory = (input: string, result: TranslationResult, tags: string[] = []): HistoryItem => {
-  const current = getHistory();
+  let current = getHistory();
+  
+  // Remove seed/mock data completely once the user saves their first real entry.
+  // This ensures simulated patient data doesn't mix with real production data.
+  if (current.some(item => item.id.startsWith('seed-'))) {
+    current = current.filter(item => !item.id.startsWith('seed-'));
+  }
+
   const newItem: HistoryItem = {
     id: Date.now().toString(),
     timestamp: Date.now(),

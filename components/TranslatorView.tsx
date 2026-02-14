@@ -3,7 +3,7 @@ import { translateClinicalNotes, runMockAudit, fetchDMEGuidelines } from '../ser
 import { saveToHistory } from '../services/storageService';
 import { TranslationResult, MockAuditResult, ImageAttachment } from '../types';
 import ReactMarkdown from 'react-markdown';
-import { ArrowRight, FileText, CheckCircle, AlertCircle, Loader2, Link as LinkIcon, Lightbulb, Zap, X, Mic, MicOff, Camera, Upload, ShieldAlert, BadgeCheck, MapPin, Clock, BookOpen, ListChecks } from 'lucide-react';
+import { ArrowRight, FileText, CheckCircle, AlertCircle, Loader2, Link as LinkIcon, Lightbulb, Zap, X, Mic, MicOff, Camera, Upload, ShieldAlert, BadgeCheck, MapPin, Clock, BookOpen, ListChecks, Bot } from 'lucide-react';
 
 const DME_HINTS = [
   { keywords: ['wheelchair', 'scooter', 'power chair'], label: 'Mobility Device', hint: 'Ensure you document the patient\'s inability to perform MRADLs (Mobility-Related Activities of Daily Living) using a cane or walker. State why lesser equipment is ruled out.' },
@@ -33,13 +33,18 @@ const QUICK_TEMPLATES = [
   { label: 'Hospital Bed', text: "Patient is bedbound due to severe stroke. Needs a hospital bed because they can't sleep flat due to aspiration risk and needs head elevated 45 degrees." }
 ];
 
-const TranslatorView: React.FC = () => {
-  const [input, setInput] = useState('');
+interface TranslatorViewProps {
+  initialInput?: string;
+}
+
+const TranslatorView: React.FC<TranslatorViewProps> = ({ initialInput = '' }) => {
+  const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeHint, setActiveHint] = useState<{label: string, hint: string} | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [showAssistantBanner, setShowAssistantBanner] = useState(true);
 
   // Guide / Cheat Sheet State
   const [guideKeyword, setGuideKeyword] = useState<string | null>(null);
@@ -62,6 +67,15 @@ const TranslatorView: React.FC = () => {
   // EVV State
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const startTimeRef = useRef<number>(Date.now());
+
+  // Handle Initial Input from Props (e.g. from Onboarding)
+  useEffect(() => {
+    if (initialInput) {
+      setInput(initialInput);
+      setShowAssistantBanner(false);
+      // Optional: Auto-run logic could go here if desired
+    }
+  }, [initialInput]);
 
   // Initialize Speech Recognition & Geolocation
   useEffect(() => {
@@ -134,6 +148,7 @@ const TranslatorView: React.FC = () => {
              data: matches[2],
              previewUrl: result
            });
+           setShowAssistantBanner(false);
         }
       };
       reader.readAsDataURL(file);
@@ -162,6 +177,11 @@ const TranslatorView: React.FC = () => {
       setActiveHint({ label: foundHint.label, hint: foundHint.hint });
     } else {
       setActiveHint(null);
+    }
+
+    // Hide banner if user starts typing
+    if (input.length > 5 && showAssistantBanner) {
+        setShowAssistantBanner(false);
     }
 
     // 2. Debounced Live Guide Fetching
@@ -196,7 +216,7 @@ const TranslatorView: React.FC = () => {
     const timer = setTimeout(checkKeywords, 1500); // 1.5s debounce for cheat sheet
     return () => clearTimeout(timer);
 
-  }, [input, guideKeyword]);
+  }, [input, guideKeyword, showAssistantBanner]);
 
   const handleTranslate = async () => {
     if (!input.trim() && !image) return;
@@ -204,6 +224,7 @@ const TranslatorView: React.FC = () => {
     setError(null);
     setResult(null);
     setAuditResult(null);
+    setShowAssistantBanner(false);
 
     const duration = (Date.now() - startTimeRef.current) / 60000; // in minutes
 
@@ -250,6 +271,7 @@ const TranslatorView: React.FC = () => {
     setError(null);
     setGuideKeyword(null);
     setGuidelines([]);
+    setShowAssistantBanner(true);
     startTimeRef.current = Date.now(); // Reset timer
   };
 
@@ -258,6 +280,7 @@ const TranslatorView: React.FC = () => {
     setImage(null);
     setResult(null);
     setAuditResult(null);
+    setShowAssistantBanner(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     startTimeRef.current = Date.now(); // Reset timer
   };
@@ -322,15 +345,40 @@ const TranslatorView: React.FC = () => {
             </div>
             
             <div className="relative">
+                {/* Zero Friction Assistant Banner */}
+                {showAssistantBanner && !input && !image && (
+                   <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none p-6">
+                      <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-lg rounded-xl p-4 max-w-md w-full pointer-events-auto cursor-pointer group hover:scale-[1.02] transition-transform" onClick={() => loadTemplate(QUICK_TEMPLATES[0].text)}>
+                         <div className="flex items-start gap-3">
+                           <div className="bg-blue-100 p-2 rounded-full shrink-0">
+                              <Bot className="w-5 h-5 text-blue-600" />
+                           </div>
+                           <div>
+                              <h3 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-blue-600 transition-colors">Hi, I'm your Compliance Assistant.</h3>
+                              <p className="text-xs text-slate-500 mb-3">
+                                Not sure where to start? Click here to load a complex mobility case demo and watch me generate the documentation.
+                              </p>
+                              <div className="flex items-center text-xs font-semibold text-blue-600 uppercase tracking-wide">
+                                <span>Try Demo Case</span>
+                                <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" />
+                              </div>
+                           </div>
+                         </div>
+                      </div>
+                   </div>
+                )}
+
                 <textarea
-                  className="w-full h-48 p-6 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-lg leading-relaxed resize-y"
-                  placeholder="Type notes or capture voice/photos..."
+                  className="w-full h-48 p-6 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-lg leading-relaxed resize-y bg-transparent relative z-0"
+                  placeholder={showAssistantBanner ? "" : "Type notes or capture voice/photos..."}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onFocus={() => setShowAssistantBanner(false)}
+                  onBlur={() => { if(!input && !image) setShowAssistantBanner(true) }}
                 />
                 
                 {/* Action Buttons: Dictation & Camera */}
-                <div className="absolute bottom-4 right-4 flex gap-2">
+                <div className="absolute bottom-4 right-4 flex gap-2 z-20">
                   <input 
                     type="file" 
                     accept="image/*" 
