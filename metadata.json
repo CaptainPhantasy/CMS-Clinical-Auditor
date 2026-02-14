@@ -1,0 +1,8 @@
+{
+  "name": "CMS Clinical Auditor",
+  "description": "A medical compliance tool that translates clinical notes into Medicare/Medicaid compliant terminology using advanced AI auditing.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
